@@ -57,7 +57,7 @@ class recipe_info:
         self.recipe_time = item_time_container.text.strip()
 #         print(item_time)
         #download name
-        self.recipe_name = item.a['title']
+        self.recipe_name = item.a['title'].replace('/','')
 #         print(item_name)
         #download image link
         self.recipe_img_link = item.img['src']
@@ -68,31 +68,38 @@ class recipe_info:
 #         print(item_extend_url)
         
     def insert_icon_text(self, step):
-        img_string = step.img
-        operation = '#' + img_string['title'] + '#'
-        step_icon = str(step).replace(str(img_string),operation)
-        step_icon_soup = BeautifulSoup(step_icon,'html.parser')
-        return step_icon_soup.text.strip()
+        try:
+            img_string = step.img
+            operation = '#' + img_string['title'] + '#'
+            step_icon = str(step).replace(str(img_string),operation)
+            step_icon_soup = BeautifulSoup(step_icon,'html.parser')
+            return step_icon_soup.text.strip().replace('\xa0',' ')
+        except:
+            step_image_url = step.img['src']
+            return " ".join(step.text.split()) + "$" + step_image_url +"$"
 
     def download_recipe_steps_ingredients(self, step_list,ingredient_list):
         self.recipe_steps = []
         if len(step_list) == 1:
-            step_list_container = step_list[0].find_all('p')
-            if (len(step_list_container) > 1):
-                for step in step_list_container:
-                    step_text = step.text.strip()
-                    if step_text != '':
-                        self.recipe_steps.append(step_text)
-            elif(sum(1 for e in step_list[0].childGenerator())>4):
-                for step in step_list[0].childGenerator():
-                    if not (step and isinstance(step,NavigableString)):
-                        continue
-                    elif(str(step).strip() ==''):
-                        continue
-                    else:
-                        self.recipe_steps.append(str(step).strip())
-            else:
-                self.recipe_steps.append(" ".join(step_list[0].text.split()))
+            try:
+                self.recipe_steps.append(self.insert_icon_text(step_list[0]))
+            except:
+                step_list_container = step_list[0].find_all('p')
+                if (len(step_list_container) > 1):
+                    for step in step_list_container:
+                        step_text = step.text.strip()
+                        if step_text != '':
+                            self.recipe_steps.append(step_text.replace('\xa0',' '))
+                elif(sum(1 for e in step_list[0].childGenerator())>4):
+                    for step in step_list[0].childGenerator():
+                        if not (step and isinstance(step,NavigableString)):
+                            continue
+                        elif(str(step).strip() ==''):
+                            continue
+                        else:
+                            self.recipe_steps.append(str(step).strip())
+                else:
+                    self.recipe_steps.append(" ".join(step_list[0].text.split()))
         else:
             for i in range(len(step_list)):
                 if (step_list[i].img != None):
@@ -123,7 +130,8 @@ class recipe_info:
         #find ingredients list and portion
         ingredients_container = recipe_html_soup.find('div', class_ = 'ingredients')
         ingredient_list = ingredients_container.find_all('li')
-        self.recipe_portion = ingredients_container.find('p',class_='padding-bottom-10').text.strip()
+        if (ingredients_container.find('p',class_='padding-bottom-10')):
+            self.recipe_portion = ingredients_container.find('p',class_='padding-bottom-10').text.strip()
 
         #download if tested
         iftested_container = recipe_html_soup.find('span','recipe-testing-status-text')
@@ -152,9 +160,10 @@ class recipe_info:
         #preparation time dowload
         time_container = addtion_info_list[0]
         preparation_time_container = time_container.find_all('div',class_='smallText')
-        self.preparation_time = preparation_time_container[0].find("span", id="preparation-time-final").text.strip()
-        #cooking method
-        cooking_method = preparation_time_container[1].text.strip()
+        if (preparation_time_container):
+            self.preparation_time = preparation_time_container[0].find("span", id="preparation-time-final").text.strip()
+            #cooking method
+            cooking_method = preparation_time_container[1].text.strip()
         #machine and machine addtional info
         machine_contianer = addtion_info_list[2]
         self.machine_name = machine_contianer.h5.text
@@ -206,75 +215,85 @@ class recipe_info:
 
 
 if __name__ == "__main__":
-	home_url = "https://www.recipecommunity.com.au"
-	categories_info_file = get_categories()
-	categories_data = pd.read_csv(categories_info_file, index_col=0)
-	dataset_columns = ['link','img link','rating','number vote','number favorite',
-		           'difficulty','cooking time','portion','preparation time',
-		           'author','if tested','accessories','steps','ingredients','recipe created for',
-		           'machine addtional info','addtional categories','variation link','variation name']
+        print('Remainder ------ ')
+        print('Recipe step icon name is rounded by # ')
+        print('Recipe image url is rounded by $ ')
+        home_url = "https://www.recipecommunity.com.au"
 
+        categories_info_file = get_categories()
+        categories_data = pd.read_csv(categories_info_file, index_col=0)
+        dataset_columns = ['link','img link','rating','number vote','number favorite',
+        	           'difficulty','cooking time','portion','preparation time',
+        	           'author','if tested','accessories','steps','ingredients','recipe created for',
+        	           'machine addtional info','addtional categories','variation link','variation name']
+        
+        
+        categories_indices = categories_data.index
+        counter = 0
+        for category_index in categories_indices:
+            print('/*******************************/')
+            print('Start Download Category '+ str(category_index))
+            print('/*******************************/')
+            #creat folders and init file name
+            os.mkdir(str(category_index))
+            category_recipe_outfile = str(category_index) + '/'+str(category_index)+'.csv' 
+            items_data = pd.DataFrame(columns=dataset_columns)
+            #get item url
+            category_url = categories_data['link'][category_index]
+        #     print(item_url)
+            category_response = get(category_url)
+            category_html_soup = BeautifulSoup(category_response.text, 'html.parser')
+            
+            pager_container = category_html_soup.find('div',class_= 'pager')
+            lastpage_extend = pager_container.a['href']
+            pager_number = re.findall('[0-9]+', lastpage_extend)[0]
+            pager_number = int(pager_number)
+        
+            try:
+                for current_page in range(1,pager_number+1): 
+                    page_url= category_url + '?page=' + str(current_page)
+                    print(page_url)
+                                    
+                    #download url contents and apply beautifulsoup
+                    item_response = get(page_url)
+                    item_html_soup = BeautifulSoup(item_response.text, 'html.parser')
+                    
+                    
+                    #find items on the first page
+                    items_container = item_html_soup.find_all('div', class_ = 'thumbnail result-recipe result-grid-display')
+                    
+                    for item in items_container:
+                        #init recipe class
+                        recipe_class = recipe_info()
+                        recipe_class.item_info_download(item)
+                        print("downloading "+ recipe_class.recipe_name)
+                        
+                        #download html
+                        html_path = str(category_index)
+                        recipe_class.download_html(html_path)
+                        
+                          #process recipe url
+                        recipe_class.recipe_download_details()
+                        
+                        #create recipe data frame
+                        item_dic = recipe_class.create_data_frame()
+                        item_info = pd.DataFrame(item_dic,index=[recipe_class.recipe_name])
+                        items_data = items_data.append(item_info)
+                       # counter = counter +1
+                       # if counter >= 1:
+                       #     break
+                print('/*******************************/')
+                print('Category '+ str(category_index)+' saved')
+                print('/*******************************/')
+                items_data.to_csv(category_recipe_outfile, index = True,sep=",")
+        	#finish current pager crawler
+            except:
+                items_data.to_csv(category_recipe_outfile, index = True,sep=",")
+                log_file = open('error.log', 'a')
+                log_file.write("Error occured!!! \n")
+                log_file.write(page_url + '\n')
+                log_file.close()
 
-	categories_indices = categories_data.index
-	counter = 0
-	for category_index in categories_indices:
-	    print('/*******************************/')
-	    print('Start Download Category '+ str(category_index))
-	    print('/*******************************/')
-	    #creat folders and init file name
-	    os.mkdir(str(category_index))
-	    category_recipe_outfile = str(category_index) + '/'+str(category_index)+'.csv' 
-	    items_data = pd.DataFrame(columns=dataset_columns)
-	    #get item url
-	    category_url = categories_data['link'][category_index]
-	#     print(item_url)
-	    category_response = get(category_url)
-	    category_html_soup = BeautifulSoup(category_response.text, 'html.parser')
-	    
-	    pager_container = category_html_soup.find('div',class_= 'pager')
-	    lastpage_extend = pager_container.a['href']
-	    pager_number = re.findall('[0-9]+', lastpage_extend)[0]
-	    pager_number = int(pager_number)
-
-	    for current_page in range(1,pager_number+1): 
-                page_url= category_url + '?page=' + str(current_page)
-                print(page_url)
-                                
-                #download url contents and apply beautifulsoup
-                item_response = get(page_url)
-                item_html_soup = BeautifulSoup(item_response.text, 'html.parser')
-                
-                
-                #find items on the first page
-                items_container = item_html_soup.find_all('div', class_ = 'thumbnail result-recipe result-grid-display')
-                
-                for item in items_container:
-                    #init recipe class
-                    recipe_class = recipe_info()
-                    recipe_class.item_info_download(item)
-                    print("downloading "+ recipe_class.recipe_name)
-                    
-                    #download html
-                    html_path = str(category_index)
-                    recipe_class.download_html(html_path)
-                    
-                      #process recipe url
-                    recipe_class.recipe_download_details()
-                    
-                    #create recipe data frame
-                    item_dic = recipe_class.create_data_frame()
-                    item_info = pd.DataFrame(item_dic,index=[recipe_class.recipe_name])
-                    items_data = items_data.append(item_info)
-                   # counter = counter +1
-                   # if counter >= 1:
-                   #     break
-	    print('/*******************************/')
-	    print('Category '+ str(category_index)+' saved')
-	    print('/*******************************/')
-	    items_data.to_csv(category_recipe_outfile, index = True,sep=",")
-		#finish current pager crawler
-	    #finish all pages
-	    break
 
 
 
