@@ -57,7 +57,7 @@ class recipe_info:
         self.recipe_time = item_time_container.text.strip()
 #         print(item_time)
         #download name
-        self.recipe_name = item.a['title'].replace('/','')
+        self.recipe_name = item.a['title'].replace('/','').replace(' ','')
 #         print(item_name)
         #download image link
         self.recipe_img_link = item.img['src']
@@ -166,18 +166,20 @@ class recipe_info:
             cooking_method = preparation_time_container[1].text.strip()
         #machine and machine addtional info
         machine_contianer = addtion_info_list[2]
-        self.machine_name = machine_contianer.h5.text
+        if (machine_contianer.h5 != None):
+            self.machine_name = machine_contianer.h5.text
         self.machine_addtional_info = machine_contianer.find('div',class_="margin-top-10")
         if(self.machine_addtional_info!=None):
             self.machine_addtional_info = self.machine_addtional_info.text.strip()
         #addtional categroies
-        addtional_categories_container = addtion_info_list[4]
-        addtional_categories_list =addtional_categories_container.find_all('a',class_='catText preventDefault')
-        self.addtional_categories_dic ={}
-        self.addtional_categories_name = []
-        for category in addtional_categories_list:
-            self.addtional_categories_name.append(category.text)
-            self.addtional_categories_dic[category.text] = category['href']
+        if(len(addtion_info_list) >4):
+            addtional_categories_container = addtion_info_list[4]
+            addtional_categories_list =addtional_categories_container.find_all('a',class_='catText preventDefault')
+            self.addtional_categories_dic ={}
+            self.addtional_categories_name = []
+            for category in addtional_categories_list:
+                self.addtional_categories_name.append(category.text)
+                self.addtional_categories_dic[category.text] = category['href']
         
     def create_data_frame(self):
         #create data frame
