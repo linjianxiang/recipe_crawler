@@ -6,7 +6,8 @@ import os
 import re
 import sys
 import urllib.request, urllib.error, urllib.parse
-
+import time
+import argparse
 class recipe_info:
     def __init__(self):
         self.recipe_name = None
@@ -215,8 +216,17 @@ class recipe_info:
         f.write(webContent)
         f.close
 
+def load_arg():
+    parser = argparse.ArgumentParser(description='To resume download, default will download from scratch')
+    parser.add_argument('-c','--category', type=str,
+                               help='start category name')
+    args = parser.parse_args()
+    return args
 
 if __name__ == "__main__":
+        args =  load_arg()
+        category_start = args.category
+
         print('Remainder ------ ')
         print('Recipe step icon name is rounded by # ')
         print('Recipe image url is rounded by $ ')
@@ -231,13 +241,39 @@ if __name__ == "__main__":
         
         
         categories_indices = categories_data.index
-        counter = 0
+
+        if(category_start != None):
+            start_flag = False
+        else:
+
+            category_start = categories_indices[0]
+            start_flag = True
+            print("Download from the first category")
+
+        if (not category_start in categories_indices) and (category_start != None):
+            print(category_start, " is not a valid category name")
+            print("valid category names are :")
+            print(categories_data.index)
+            exit(1)
+
+
+
+
         for category_index in categories_indices:
+            if(category_index == category_start) or (start_flag):
+                start_flag = True
+            else:
+                continue
+
+
             print('/*******************************/')
             print('Start Download Category '+ str(category_index))
             print('/*******************************/')
             #creat folders and init file name
-            os.mkdir(str(category_index))
+            if not os.path.isdir(str(category_index)):
+                print("create directory for ", str(category_index))
+                os.mkdir(str(category_index))
+
             category_recipe_outfile = str(category_index) + '/'+str(category_index)+'.csv' 
             items_data = pd.DataFrame(columns=dataset_columns)
             #get item url
@@ -251,20 +287,21 @@ if __name__ == "__main__":
             pager_number = re.findall('[0-9]+', lastpage_extend)[0]
             pager_number = int(pager_number)
         
-            try:
-                for current_page in range(1,pager_number+1): 
-                    page_url= category_url + '?page=' + str(current_page)
-                    print(page_url)
-                                    
-                    #download url contents and apply beautifulsoup
-                    item_response = get(page_url)
-                    item_html_soup = BeautifulSoup(item_response.text, 'html.parser')
-                    
-                    
-                    #find items on the first page
-                    items_container = item_html_soup.find_all('div', class_ = 'thumbnail result-recipe result-grid-display')
-                    
-                    for item in items_container:
+            for current_page in range(1,pager_number+1): 
+                page_url= category_url + '?page=' + str(current_page)
+                print(page_url)
+                                
+                #download url contents and apply beautifulsoup
+                item_response = get(page_url)
+                item_html_soup = BeautifulSoup(item_response.text, 'html.parser')
+                
+                
+                #find items on the first page
+                items_container = item_html_soup.find_all('div', class_ = 'thumbnail result-recipe result-grid-display')
+                
+                for item in items_container:
+
+                    try:
                         #init recipe class
                         recipe_class = recipe_info()
                         recipe_class.item_info_download(item)
@@ -281,26 +318,16 @@ if __name__ == "__main__":
                         item_dic = recipe_class.create_data_frame()
                         item_info = pd.DataFrame(item_dic,index=[recipe_class.recipe_name])
                         items_data = items_data.append(item_info)
-                       # counter = counter +1
-                       # if counter >= 1:
-                       #     break
-                print('/*******************************/')
-                print('Category '+ str(category_index)+' saved')
-                print('/*******************************/')
-                items_data.to_csv(category_recipe_outfile, index = True,sep=",")
-        	#finish current pager crawler
-            except:
-                items_data.to_csv(category_recipe_outfile, index = True,sep=",")
-                log_file = open('error.log', 'a')
-                log_file.write("Error occured!!! \n")
-                log_file.write(page_url + '\n')
-                log_file.close()
+                    except:
+                        log_file = open('error.log', 'a')
+                        log_file.write("Error occured!!! \n")
+                        log_file.write(recipe_class.recipe_url + '\n')
+                        log_file.close()
 
-
-
-
-
-
-
-
+                     
+            print('/*******************************/')
+            print('Category '+ str(category_index)+' saved')
+            print('/*******************************/')
+            items_data.to_csv(category_recipe_outfile, index = True,sep=",")
+            #finish current pager crawler
 
