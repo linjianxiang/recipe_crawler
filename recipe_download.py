@@ -28,7 +28,7 @@ if __name__ == "__main__":
         categories_info_file = get_categories()
         categories_data = pd.read_csv(categories_info_file, index_col=0)
         dataset_columns = ['link','img link','rating','number vote','number favorite',
-        	           'difficulty','cooking time','portion','preparation time',
+        	           'difficulty','cooking time','portion','preparation time','tips',
         	           'author','if tested','accessories','steps','ingredients','recipe created for',
         	           'machine addtional info','addtional categories','variation link','variation name']
         
